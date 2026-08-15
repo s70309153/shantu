@@ -4,6 +4,16 @@ const sourceProjectId = params.get('project') || '';
 const CANVAS_LIST_PROJECT_KEY = 'canvasListCurrentProjectId';
 const shell = document.getElementById('shell');
 const world = document.getElementById('world');
+const smartProjectBar = document.getElementById('smartProjectBar');
+const smartProjectToggle = document.getElementById('smartProjectToggle');
+const smartProjectName = document.getElementById('smartProjectName');
+const smartProjectCreateBtn = document.getElementById('smartProjectCreateBtn');
+const smartProjectMenu = document.getElementById('smartProjectMenu');
+const smartProjectCurrent = document.getElementById('smartProjectCurrent');
+const smartProjectList = document.getElementById('smartProjectList');
+const smartProjectCreateForm = document.getElementById('smartProjectCreateForm');
+const smartProjectNewBtn = document.getElementById('smartProjectNewBtn');
+const smartProjectDeleteConfirm = document.getElementById('smartProjectDeleteConfirm');
 const composer = document.getElementById('composer');
 const createMenu = document.getElementById('createMenu');
 const promptInput = document.getElementById('promptInput');
@@ -1160,6 +1170,331 @@ function backToCanvasList(){
     savePromptDraftForCurrent();
     window.location.href = canvasListUrlForProject(canvas?.project || sourceProjectId || 'default');
 }
+let smartProjectRecords = [];
+let smartProjectCanvases = [];
+let smartProjectCreateOpen = false;
+let smartProjectDeleteId = '';
+
+function smartProjectText(zh, en){
+    return window.StudioI18n?.lang?.() === 'en' ? en : zh;
+}
+
+function smartProjectTime(value){
+    const raw = Number(value || 0);
+    const stamp = raw > 0 && raw < 10000000000 ? raw * 1000 : raw;
+    const date = stamp ? new Date(stamp) : null;
+    if(!date || Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(window.StudioI18n?.lang?.() === 'en' ? 'en-US' : 'zh-CN', {
+        month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'
+    });
+}
+
+function smartProjectId(){
+    const remembered = (() => {
+        try { return localStorage.getItem(CANVAS_LIST_PROJECT_KEY) || ''; } catch(e) { return ''; }
+    })();
+    const preferred = canvas?.project || sourceProjectId || remembered || 'default';
+    if(smartProjectRecords.some(project => project.id === preferred)) return preferred;
+    return smartProjectRecords.find(project => project.id === 'default')?.id || smartProjectRecords[0]?.id || 'default';
+}
+
+function smartProjectRecord(projectId = smartProjectId()){
+    return smartProjectRecords.find(project => project.id === projectId) || null;
+}
+
+function smartProjectCanvas(projectId){
+    return smartProjectCanvases
+        .filter(item => item.kind === 'smart' && (item.project || 'default') === projectId)
+        .sort((a, b) => Number(b.updated_at || b.created_at || 0) - Number(a.updated_at || a.created_at || 0))[0] || null;
+}
+
+function smartProjectIcon(name){
+    const icon = document.createElement('i');
+    icon.dataset.lucide = name;
+    return icon;
+}
+
+function smartProjectCopy(name, subtext){
+    const copy = document.createElement('span');
+    copy.className = 'smart-project-copy';
+    const title = document.createElement('strong');
+    title.textContent = name;
+    const sub = document.createElement('small');
+    sub.textContent = subtext;
+    copy.append(title, sub);
+    return copy;
+}
+
+function setSmartProjectMenuOpen(open){
+    if(!smartProjectMenu || !smartProjectToggle) return;
+    smartProjectMenu.classList.toggle('open', open);
+    smartProjectToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if(!open){
+        smartProjectCreateOpen = false;
+        smartProjectDeleteId = '';
+    }
+    renderSmartProjectMenu();
+}
+
+function renderSmartProjectMenu(){
+    if(!smartProjectMenu || !smartProjectName || !smartProjectCurrent || !smartProjectList) return;
+    const currentId = smartProjectId();
+    const current = smartProjectRecord(currentId);
+    const currentName = current?.name || smartProjectText('默认项目', 'Default project');
+    smartProjectName.textContent = currentName;
+    document.getElementById('smartProjectCurrentLabel').textContent = smartProjectText('当前项目', 'Current project');
+    document.getElementById('smartProjectListLabel').textContent = smartProjectText('项目列表', 'Projects');
+    document.getElementById('smartProjectActionsLabel').textContent = smartProjectText('操作', 'Actions');
+    smartProjectNewBtn?.querySelector('span')?.replaceChildren(document.createTextNode(smartProjectText('新建项目', 'New project')));
+
+    const currentRow = document.createElement('div');
+    currentRow.className = 'smart-project-current-row';
+    currentRow.append(smartProjectIcon('folder-open'), smartProjectCopy(currentName, smartProjectText('智能画布', 'Smart canvas')));
+    smartProjectCurrent.replaceChildren(currentRow);
+
+    smartProjectList.replaceChildren();
+    smartProjectRecords.forEach(project => {
+        const active = project.id === currentId;
+        const row = document.createElement('div');
+        row.className = 'smart-project-row' + (active ? ' active' : '');
+        row.dataset.projectId = project.id;
+        row.setAttribute('role', 'menuitem');
+        row.tabIndex = 0;
+        row.append(
+            smartProjectIcon(active ? 'folder-open' : 'folder'),
+            smartProjectCopy(
+                project.name || smartProjectText('未命名项目', 'Untitled project'),
+                smartProjectTime(project.updated_at || project.created_at) || smartProjectText('刚刚创建', 'Created just now')
+            )
+        );
+        row.addEventListener('click', event => {
+            if(event.target.closest('[data-project-delete]')) return;
+            openSmartProject(project.id);
+        });
+        row.addEventListener('keydown', event => {
+            if(event.key === 'Enter' || event.key === ' '){
+                event.preventDefault();
+                openSmartProject(project.id);
+            }
+        });
+        if(project.id !== 'default'){
+            const remove = document.createElement('button');
+            remove.className = 'smart-project-delete';
+            remove.type = 'button';
+            remove.dataset.projectDelete = project.id;
+            remove.title = smartProjectText('删除项目', 'Delete project');
+            remove.setAttribute('aria-label', remove.title);
+            remove.append(smartProjectIcon('x'));
+            remove.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                smartProjectDeleteId = project.id;
+                smartProjectCreateOpen = false;
+                renderSmartProjectMenu();
+            });
+            row.append(remove);
+        }
+        smartProjectList.append(row);
+    });
+
+    smartProjectCreateForm.hidden = !smartProjectCreateOpen;
+    smartProjectCreateForm.replaceChildren();
+    if(smartProjectCreateOpen){
+        const input = document.createElement('input');
+        input.id = 'smartProjectCreateInput';
+        input.type = 'text';
+        input.maxLength = 80;
+        input.placeholder = smartProjectText('项目名称', 'Project name');
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.title = smartProjectText('创建', 'Create');
+        confirm.setAttribute('aria-label', confirm.title);
+        confirm.append(smartProjectIcon('check'));
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.title = smartProjectText('取消', 'Cancel');
+        cancel.setAttribute('aria-label', cancel.title);
+        cancel.append(smartProjectIcon('x'));
+        const submit = () => createSmartProject(input.value);
+        confirm.addEventListener('click', submit);
+        cancel.addEventListener('click', () => {
+            smartProjectCreateOpen = false;
+            renderSmartProjectMenu();
+        });
+        input.addEventListener('keydown', event => {
+            if(event.key === 'Enter'){ event.preventDefault(); submit(); }
+            if(event.key === 'Escape'){ event.preventDefault(); smartProjectCreateOpen = false; renderSmartProjectMenu(); }
+        });
+        smartProjectCreateForm.append(input, confirm, cancel);
+        requestAnimationFrame(() => input.focus());
+    }
+
+    smartProjectDeleteConfirm.hidden = !smartProjectDeleteId;
+    smartProjectDeleteConfirm.replaceChildren();
+    if(smartProjectDeleteId){
+        const deleting = smartProjectRecord(smartProjectDeleteId);
+        const question = document.createElement('span');
+        question.textContent = smartProjectText('删除', 'Delete') + ' ' + (deleting?.name || '') + '?';
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.textContent = smartProjectText('取消', 'Cancel');
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.className = 'danger';
+        confirm.textContent = smartProjectText('删除', 'Delete');
+        cancel.addEventListener('click', () => {
+            smartProjectDeleteId = '';
+            renderSmartProjectMenu();
+        });
+        confirm.addEventListener('click', () => deleteSmartProject(smartProjectDeleteId));
+        smartProjectDeleteConfirm.append(question, cancel, confirm);
+    }
+    refreshIcons();
+}
+
+async function loadSmartProjectHub(){
+    try {
+        const [projectResponse, canvasResponse] = await Promise.all([
+            fetch('/api/projects', {cache:'no-store'}),
+            fetch('/api/canvases', {cache:'no-store'})
+        ]);
+        const projectData = projectResponse.ok ? await projectResponse.json() : {projects:[]};
+        const canvasData = canvasResponse.ok ? await canvasResponse.json() : {canvases:[]};
+        smartProjectRecords = (projectData.projects || []).slice().sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+        if(!smartProjectRecords.length) smartProjectRecords = [{id:'default', name:smartProjectText('默认项目', 'Default project'), order:0}];
+        smartProjectCanvases = Array.isArray(canvasData.canvases) ? canvasData.canvases : [];
+        rememberCanvasListProject(smartProjectId());
+    } catch(e) {
+        if(!smartProjectRecords.length) smartProjectRecords = [{id:'default', name:smartProjectText('默认项目', 'Default project'), order:0}];
+    }
+    renderSmartProjectMenu();
+}
+
+function nextSmartProjectName(){
+    const taken = smartProjectRecords
+        .map(project => String(project.name || '').match(/^项目\s*(\d+)$/)?.[1])
+        .map(Number)
+        .filter(Number.isFinite);
+    const next = (taken.length ? Math.max(...taken) : 0) + 1;
+    return smartProjectText('项目 ' + next, 'Project ' + next);
+}
+
+async function ensureSmartCanvasForProject(projectId){
+    const existing = smartProjectCanvas(projectId);
+    if(existing) return existing;
+    const response = await fetch('/api/canvases', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+            title:smartProjectText('智能画布', 'Smart Canvas'),
+            icon:'sparkles',
+            kind:'smart',
+            project:projectId
+        })
+    });
+    if(!response.ok) throw new Error('create smart canvas failed');
+    const data = await response.json();
+    if(!data.canvas?.id) throw new Error('smart canvas missing');
+    smartProjectCanvases.push(data.canvas);
+    return data.canvas;
+}
+
+function smartCanvasUrl(canvasRecord, projectId){
+    return '/static/smart-canvas.html?id=' + encodeURIComponent(canvasRecord.id)
+        + '&project=' + encodeURIComponent(projectId) + '&v=2026.08.15.project-hub.1';
+}
+
+async function openSmartProject(projectId){
+    if(!projectId || !smartProjectRecord(projectId)) return;
+    try {
+        if(canvas && (canvas.project || 'default') !== projectId) await saveCanvas();
+        const targetCanvas = await ensureSmartCanvasForProject(projectId);
+        rememberCanvasListProject(projectId);
+        if(canvasId === targetCanvas.id){
+            setSmartProjectMenuOpen(false);
+            return;
+        }
+        location.assign(smartCanvasUrl(targetCanvas, projectId));
+    } catch(e) {
+        toast(smartProjectText('打开项目失败', 'Could not open project'));
+    }
+}
+
+async function createSmartProject(rawName){
+    const name = String(rawName || '').trim() || nextSmartProjectName();
+    try {
+        const response = await fetch('/api/projects', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({name})
+        });
+        if(!response.ok) throw new Error('create project failed');
+        const data = await response.json();
+        if(!data.project?.id) throw new Error('project missing');
+        smartProjectRecords.push(data.project);
+        smartProjectRecords.sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+        await openSmartProject(data.project.id);
+    } catch(e) {
+        toast(smartProjectText('创建项目失败', 'Could not create project'));
+    }
+}
+
+async function deleteSmartProject(projectId){
+    const wasCurrent = projectId === smartProjectId();
+    try {
+        const response = await fetch('/api/projects/' + encodeURIComponent(projectId), {method:'DELETE'});
+        if(!response.ok) throw new Error('delete project failed');
+        smartProjectRecords = smartProjectRecords.filter(project => project.id !== projectId);
+        smartProjectCanvases = smartProjectCanvases.map(item => (
+            (item.project || 'default') === projectId ? {...item, project:'default'} : item
+        ));
+        smartProjectDeleteId = '';
+        if(wasCurrent){
+            await openSmartProject(smartProjectRecord('default')?.id || smartProjectRecords[0]?.id || 'default');
+        } else {
+            renderSmartProjectMenu();
+        }
+    } catch(e) {
+        toast(smartProjectText('删除项目失败', 'Could not delete project'));
+    }
+}
+
+async function ensureSmartCanvasEntry(){
+    await loadSmartProjectHub();
+    if(canvasId) return true;
+    try {
+        const projectId = smartProjectId();
+        const targetCanvas = await ensureSmartCanvasForProject(projectId);
+        rememberCanvasListProject(projectId);
+        location.replace(smartCanvasUrl(targetCanvas, projectId));
+    } catch(e) {
+        toast(smartProjectText('打开智能画布失败', 'Could not open Smart Canvas'));
+    }
+    return false;
+}
+
+function initSmartProjectHub(){
+    smartProjectToggle?.addEventListener('click', () => {
+        setSmartProjectMenuOpen(!smartProjectMenu?.classList.contains('open'));
+    });
+    smartProjectCreateBtn?.addEventListener('click', () => {
+        setSmartProjectMenuOpen(true);
+        smartProjectCreateOpen = true;
+        smartProjectDeleteId = '';
+        renderSmartProjectMenu();
+    });
+    smartProjectNewBtn?.addEventListener('click', () => {
+        smartProjectCreateOpen = true;
+        smartProjectDeleteId = '';
+        renderSmartProjectMenu();
+    });
+    document.addEventListener('pointerdown', event => {
+        if(!smartProjectMenu?.classList.contains('open')) return;
+        if(smartProjectMenu.contains(event.target) || smartProjectBar?.contains(event.target)) return;
+        setSmartProjectMenuOpen(false);
+    });
+}
+
 function promptPlainText(){
     return originalPromptTextFromParts(collectPromptParts());
 }
@@ -5755,7 +6090,8 @@ async function loadCanvas(){
         rememberCanvasListProject(canvas.project || 'default');
         canvasUsesConnections = Object.prototype.hasOwnProperty.call(canvas || {}, 'connections');
         document.title = canvas.title || tr('canvas.smartCanvas');
-        document.getElementById('smartTitle').textContent = canvas.title || tr('canvas.smartCanvas');
+        const smartTitle = document.getElementById('smartTitle');
+        if(smartTitle) smartTitle.textContent = canvas.title || tr('canvas.smartCanvas');
         nodes = (Array.isArray(canvas.nodes) ? canvas.nodes : []).map(normalizeLegacySmartNode).filter(Boolean);
         migrateSmartGroupImageMembers();
         canvas.connections = Array.isArray(canvas.connections) ? canvas.connections : [];
@@ -16905,6 +17241,8 @@ window.addEventListener('studio-lang-change', () => {
 });
 window.onload = async () => {
     applyTheme(localStorage.getItem('studio_theme') || localStorage.getItem('canvas_theme') || 'light');
+    initSmartProjectHub();
+    if(!(await ensureSmartCanvasEntry())) return;
     loadPromptPresets();
     loadPromptTemplateGroups();
     loadPromptTemplateOverrides();
@@ -16915,6 +17253,7 @@ window.onload = async () => {
     await loadConfig();
     await loadAssetLibrary();
     await loadCanvas();
+    await loadSmartProjectHub();
     syncApiKindToggleVisibility();
     render();
 };
