@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/images/logo.png" type="image/png">
+    <title>一键详情</title>
+    <script>
+        // Some vendor scripts may observe before the iframe body has been created.
+        (function(){
+            try {
+                const observe = MutationObserver.prototype.observe;
+                MutationObserver.prototype.observe = function(target, options){
+                    if(!target || typeof target.nodeType !== 'number') return;
+                    try { return observe.call(this, target, options); } catch(error) { return undefined; }
+                };
+            } catch(error) {}
+        })();
+    </script>
+    <script src="/static/vendor/js/lucide.js?v=2026.07.8.1783524419"></script>
+    <script src="/static/js/theme.js?v=2026.07.8.1783524419"></script>
+    <script src="/static/js/i18n.js?v=2026.08.14.one-click-detail.1"></script>
+    <link rel="stylesheet" href="/static/css/theme.css?v=2026.07.8.1783524419">
+    <link rel="stylesheet" href="/static/css/one-click-detail.css?v=2026.08.14.3">
+</head>
+<body>
+    <main class="detail-app">
+        <header class="detail-header">
+            <div>
+                <div class="detail-kicker"><span class="status-dot"></span><span data-i18n="detail.ready">详情页工作台</span></div>
+                <h1 data-i18n="detail.title">一键详情</h1>
+                <p data-i18n="detail.subtitle">使用当前自由接口，把商品素材扩展成连贯的电商详情页。</p>
+            </div>
+            <div class="detail-header-actions">
+                <span id="providerBadge" class="provider-badge">API</span>
+                <button id="downloadAllBtn" class="icon-command" type="button" title="下载全部" data-i18n-title="detail.downloadAll">
+                    <i data-lucide="download"></i><span data-i18n="detail.downloadAllShort">下载全部</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="detail-layout">
+            <aside class="detail-controls">
+                <div class="control-section">
+                    <div class="section-heading asset-heading"><span>01</span><h2>产品图（包含模特图）</h2><button id="productLibraryBtn" class="asset-library-command" type="button" title="打开素材库"><i data-lucide="folder-open"></i><span>素材库</span></button></div>
+                    <div id="productDrop" class="product-drop" tabindex="0">
+                        <input id="productInput" type="file" accept="image/*" multiple hidden>
+                        <div id="productEmpty" class="drop-empty">
+                            <i data-lucide="package-open"></i>
+                            <strong data-i18n="detail.productImage">上传产品图</strong>
+                            <small data-i18n="detail.productImageHint">拖入图片，或点击选择</small>
+                        </div>
+                        <div id="productGrid" class="product-grid" hidden></div>
+                        <button id="clearProductBtn" class="clear-image" type="button" hidden title="清空产品图"><i data-lucide="trash-2"></i></button>
+                    </div>
+                    <button id="continueAddBtn" class="continue-add-command" type="button"><i data-lucide="plus"></i><span>继续添加</span></button>
+                    <div class="reference-heading">
+                        <span>参考图（设计风格参考）</span>
+                        <small>风格、配色、版式参考</small>
+                    </div>
+                    <div id="referenceGrid" class="reference-grid">
+                        <div class="reference-slot" role="button" tabindex="0" data-ref-index="0"><i data-lucide="plus"></i><span>01</span></div>
+                        <div class="reference-slot" role="button" tabindex="0" data-ref-index="1"><i data-lucide="plus"></i><span>02</span></div>
+                        <div class="reference-slot" role="button" tabindex="0" data-ref-index="2"><i data-lucide="plus"></i><span>03</span></div>
+                        <div class="reference-slot" role="button" tabindex="0" data-ref-index="3"><i data-lucide="plus"></i><span>04</span></div>
+                        <div class="reference-slot" role="button" tabindex="0" data-ref-index="4"><i data-lucide="plus"></i><span>05</span></div>
+                        <div class="reference-slot" role="button" tabindex="0" data-ref-index="5"><i data-lucide="plus"></i><span>06</span></div>
+                    </div>
+                    <input id="referenceInput" type="file" accept="image/*" hidden>
+                    <button id="referenceLibraryBtn" class="asset-library-command reference-library-command" type="button" title="从素材库选择参考图"><i data-lucide="folder-open"></i><span>素材库</span></button>
+                    <div class="preset-actions">
+                        <button id="savePresetBtn" class="preset-command" type="button"><i data-lucide="save"></i><span>保存预设</span></button>
+                        <button id="loadPresetBtn" class="preset-command" type="button"><i data-lucide="folder-open"></i><span>加载预设</span></button>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <div class="section-heading"><span>02</span><h2>基础参数</h2></div>
+                    <div class="field-grid">
+                        <label class="field-label"><span>图片模型</span><select id="providerSelect"></select></label>
+                        <label class="field-label"><span>图片比例</span><select id="ratioSelect"><option value="portrait916" selected>9:16</option><option value="portrait">2:3</option><option value="portrait43">3:4</option><option value="square">1:1</option><option value="wide">16:9</option></select></label>
+                        <label class="field-label"><span data-i18n="detail.size">分辨率</span><select id="sizeSelect"><option value="1008x1344">1K</option><option value="1536x2048" selected>2K</option><option value="2448x3264">4K</option></select></label>
+                        <label class="field-label"><span data-i18n="detail.quality">质量</span><select id="qualitySelect"><option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option></select></label>
+                    </div>
+                    <div class="field-grid">
+                        <label class="field-label"><span>生成数量</span><select id="countSelect"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8" selected>8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select></label>
+                        <label class="field-label"><span>文案设置</span><select id="copySettingSelect"><option value="required" selected>需要文案</option><option value="blank">文案留空</option><option value="poster">无文案纯海报</option></select></label>
+                    </div>
+                    <div class="field-grid">
+                        <label class="field-label"><span>字体风格</span><select id="fontStyleSelect"><option value="auto" selected>自动判断</option><option value="neutral-sans">现代中性无衬线</option><option value="humanist-sans">人文柔和无衬线</option><option value="rounded">圆润可爱字体</option><option value="elegant-serif">典雅简约衬线</option><option value="modern-song">现代宋意字体</option><option value="brush">新中式毛笔字体</option><option value="tech">几何科技字体</option><option value="industrial">工业力量字体</option><option value="trend-hand">潮流手写展示字体</option></select></label>
+                        <label class="field-label"><span>输出语言</span><input id="outputLanguage" type="text" value="中文" placeholder="例如：中文"></label>
+                    </div>
+                    <p class="font-variant-note">字体均为 AI 变体生成，未使用现成版权字体，介意可自行核验。</p>
+                    <div class="field-grid">
+                        <label class="field-label"><span>模特设置</span><select id="modelSettings"><option value="use" selected>使用模特</option><option value="none">不使用模特</option></select></label>
+                        <label class="field-label"><span>模特姿态</span><select id="modelPose"><option value="natural" selected>常规姿态</option><option value="special">特殊姿态</option></select></label>
+                    </div>
+                    <div class="field-grid advanced-api-fields">
+                        <label class="field-label"><span>模特使用率</span><select id="modelUsage"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+                        <label class="field-label"><span>插入反转屏</span><select id="reverseScreens"><option value="0">0</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+                    </div>
+                    <details class="api-advanced">
+                        <summary><i data-lucide="sliders-horizontal"></i><span>接口设置</span><small>自由配置</small></summary>
+                        <div class="field-grid prompt-api-fields">
+                            <label class="field-label"><span data-i18n="detail.model">模型标识</span><select id="modelSelect"></select></label>
+                            <label class="field-label"><span>提示词接口</span><select id="chatProviderSelect"></select></label>
+                        </div>
+                        <label class="field-label"><span>聊天模型</span><select id="chatModelSelect"></select></label>
+                    </details>
+                    <input id="fontProtection" type="checkbox" checked hidden>
+                </div>
+
+                <div class="control-section">
+                    <div class="section-heading"><span>03</span><h2>内容输入（可选）</h2></div>
+                    <label class="field-label"><span>商品名称</span><input id="productName" type="text" placeholder="例如：蓝牙耳机（提交时加入后台产品指令）"></label>
+                    <input id="brandName" type="hidden">
+                    <label class="field-label"><span>产品特征</span><textarea id="sellingPoints" rows="3" placeholder="产品大小、尺寸、特征信息用于锁定产品一致性（可不输入）"></textarea></label>
+                    <label class="field-label prompt-field"><span>用户指令（用户指令权限高于角色定位） <button id="promptAssistantBtn" class="inline-assistant" type="button" title="提示词助手"><i data-lucide="message-square-plus"></i><span>提示词助手</span></button></span><textarea id="userPrompt" rows="8" placeholder="可指定每一屏文案、使用场景、参数列表及禁止出现的内容">输出8屏，插入反转屏2屏。</textarea></label>
+                    <button id="generatePromptBtn" class="prompt-command" type="button"><i data-lucide="wand-sparkles"></i><span>生成分段提示词</span></button>
+                </div>
+
+                <div class="control-section group-builder-section">
+                    <div class="section-heading"><span>04</span><h2>提示词分组</h2></div>
+                    <div class="section-toolbar">
+                        <span data-i18n="detail.sectionOrder">生成顺序</span>
+                        <div class="section-toolbar-actions">
+                            <button id="selectAllSections" class="mini-command" type="button" title="全选模块" data-i18n-title="detail.selectAll"><i data-lucide="check-check"></i></button>
+                            <button id="clearAllSections" class="mini-command" type="button" title="清空模块" data-i18n-title="detail.clearAll"><i data-lucide="square"></i></button>
+                        </div>
+                    </div>
+                    <div id="sectionList" class="section-list"></div>
+                </div>
+
+                <button id="generateBtn" class="generate-command" type="button"><i data-lucide="sparkles"></i><span data-i18n="detail.generate">一键生成详情页</span></button>
+                <div id="taskActions" class="task-actions" hidden>
+                    <span id="taskStatus" data-i18n="detail.taskRunning">任务进行中</span>
+                    <div class="task-action-buttons">
+                        <button id="pauseBtn" class="task-command" type="button" title="暂停任务"><i data-lucide="pause"></i><span data-i18n="detail.pause">暂停</span></button>
+                        <button id="cancelBtn" class="task-command danger" type="button" title="取消任务"><i data-lucide="x"></i><span data-i18n="detail.cancel">取消</span></button>
+                    </div>
+                </div>
+                <div class="control-status-row">
+                    <div id="statusText" class="control-status" aria-live="polite"></div>
+                    <button id="openApiSettingsBtn" class="status-action" type="button" hidden title="打开 API 设置"><i data-lucide="settings-2"></i><span data-i18n="detail.openApiSettings">配置 API</span></button>
+                </div>
+            </aside>
+            <button id="detailPanelToggle" class="detail-panel-toggle" type="button" title="收起参数栏" aria-label="收起参数栏" aria-expanded="true"><i data-lucide="chevron-left"></i></button>
+
+            <section class="detail-workspace">
+                <div class="workspace-topbar">
+                    <nav id="groupTabs" class="group-tabs" aria-label="详情分组"></nav>
+                    <div class="workspace-view-tools">
+                        <label class="display-count-control"><span>每行显示</span><select id="displayCount"><option value="4">4</option><option value="5">5</option><option value="6" selected>6</option><option value="8">8</option></select></label>
+                        <label class="sort-control"><span>正向排序</span><input id="sortToggle" type="checkbox" checked></label>
+                    </div>
+                </div>
+                <div class="workspace-toolbar">
+                    <div><span class="toolbar-label" data-i18n="detail.output">生成结果</span><span id="resultCount" class="result-count">0 张</span></div>
+                    <div class="toolbar-actions"><span id="activeGroupLabel" class="active-group-label">等待生成分段提示词</span><button id="clearResultsBtn" class="text-command" type="button" data-i18n="detail.clear">清空结果</button></div>
+                </div>
+                <div id="detailGroups" class="detail-groups">
+                    <div id="emptyState" class="empty-state"><i data-lucide="layout-template"></i><strong data-i18n="detail.emptyTitle">准备开始制作详情页</strong><span data-i18n="detail.emptyHint">上传商品图并填写卖点，生成多个详情页分段。</span></div>
+                </div>
+            </section>
+        </section>
+    </main>
+    <input id="cardReferenceInput" type="file" accept="image/*" hidden>
+    <div id="detailLightbox" class="detail-lightbox" hidden role="dialog" aria-modal="true" aria-label="图片预览">
+        <button id="lightboxClose" class="lightbox-close" type="button" title="关闭预览"><i data-lucide="x"></i></button>
+        <button id="lightboxPrev" class="lightbox-nav prev" type="button" title="上一张"><i data-lucide="chevron-left"></i></button>
+        <div class="lightbox-content">
+            <div class="lightbox-meta"><span id="lightboxTitle">详情页预览</span><span id="lightboxCounter">1 / 1</span></div>
+            <img id="lightboxImage" class="lightbox-image" alt="详情页预览">
+            <div class="lightbox-footer">
+                <span id="lightboxHint">点击左右按钮切换</span>
+                <a id="lightboxDownload" class="lightbox-download" href="#" download title="下载当前图片"><i data-lucide="download"></i></a>
+            </div>
+        </div>
+        <button id="lightboxNext" class="lightbox-nav next" type="button" title="下一张"><i data-lucide="chevron-right"></i></button>
+    </div>
+    <div id="collageModal" class="collage-modal" hidden role="dialog" aria-modal="true" aria-labelledby="collageTitle">
+        <div class="collage-dialog">
+            <div class="collage-header">
+                <div><h2 id="collageTitle">图片预览</h2><span id="collageCount">0 张</span></div>
+                <div class="collage-header-actions"><button id="collageClose" class="collage-close" type="button" title="关闭"><i data-lucide="x"></i></button></div>
+            </div>
+            <div id="collageGrid" class="collage-grid"></div>
+            <div class="collage-zoom-tools">
+                <button id="collageZoomOut" type="button" title="缩小"><i data-lucide="zoom-out"></i></button>
+                <span id="collageZoomLabel">100%</span>
+                <button id="collageZoomIn" type="button" title="放大"><i data-lucide="zoom-in"></i></button>
+                <button id="collageDownload" type="button" title="下载完整长图" disabled><i data-lucide="download"></i></button>
+                <button id="collageFullscreen" type="button" title="全屏"><i data-lucide="maximize-2"></i></button>
+            </div>
+        </div>
+    </div>
+    <div id="assetPickerModal" class="asset-picker-modal" hidden role="dialog" aria-modal="true" aria-labelledby="assetPickerTitle">
+        <div class="asset-picker-dialog">
+            <div class="asset-picker-header">
+                <div><h2 id="assetPickerTitle">从素材库选择</h2><span id="assetPickerHint">选择图片后回填到详情页任务</span></div>
+                <button id="assetPickerClose" class="asset-picker-close" type="button" title="关闭"><i data-lucide="x"></i></button>
+            </div>
+            <div class="asset-picker-toolbar">
+                <div id="assetPickerSources" class="asset-picker-sources" role="tablist" aria-label="素材来源">
+                    <button class="asset-picker-source active" type="button" data-picker-source="library" role="tab" aria-selected="true"><i data-lucide="library"></i><span>素材库</span></button>
+                    <button class="asset-picker-source" type="button" data-picker-source="local" role="tab" aria-selected="false"><i data-lucide="hard-drive"></i><span>本地素材</span></button>
+                </div>
+                <div class="asset-picker-filters">
+                    <select id="assetPickerLibrary" aria-label="素材库"></select>
+                    <select id="assetPickerCategory" aria-label="素材分组"></select>
+                    <label class="asset-picker-search"><i data-lucide="search"></i><input id="assetPickerSearch" type="search" placeholder="搜索素材名称"></label>
+                </div>
+            </div>
+            <div id="assetPickerStatus" class="asset-picker-status" aria-live="polite"></div>
+            <div id="assetPickerGrid" class="asset-picker-grid"></div>
+            <div class="asset-picker-footer">
+                <span id="assetPickerSelection">未选择</span>
+                <div class="asset-picker-actions"><button id="assetPickerCancel" class="asset-picker-cancel" type="button">取消</button><button id="assetPickerConfirm" class="asset-picker-confirm" type="button" disabled><i data-lucide="check"></i><span>使用选中素材</span></button></div>
+            </div>
+        </div>
+    </div>
+    <div id="promptEditModal" class="prompt-edit-modal" hidden role="dialog" aria-modal="true" aria-labelledby="promptEditTitle">
+        <div class="prompt-edit-dialog">
+            <div class="prompt-edit-header"><h2 id="promptEditTitle">优化第 1 屏提示词</h2><button id="promptEditClose" class="prompt-edit-close" type="button" title="关闭"><i data-lucide="x"></i></button></div>
+            <div class="prompt-edit-body">
+                <section class="prompt-edit-current">
+                    <div class="prompt-edit-label"><strong>当前提示词</strong><button id="promptRestoreBtn" class="prompt-restore-command" type="button">还原显示</button></div>
+                    <textarea id="promptEditInput" rows="18"></textarea>
+                </section>
+                <section class="prompt-edit-side">
+                    <div class="prompt-edit-field prompt-instruction-field">
+                        <div class="prompt-edit-label"><strong>优化要求</strong></div>
+                        <textarea id="promptEditInstruction" rows="5" placeholder="可以对画面进行指向性优化，只需要输入优化内容"></textarea>
+                    </div>
+                    <div class="prompt-edit-field prompt-result-field">
+                        <div class="prompt-edit-label"><strong>优化结果</strong><span id="promptResultCount">0 字</span></div>
+                        <textarea id="promptEditResult" rows="11" readonly placeholder="优化后会显示在这里"></textarea>
+                    </div>
+                    <div id="promptOptimizeStatus" class="prompt-optimize-status"></div>
+                </section>
+            </div>
+            <div class="prompt-edit-footer">
+                <span id="promptCurrentCount" class="prompt-current-count">当前 0 字</span>
+                <div class="prompt-edit-actions"><button id="promptEditCancel" class="prompt-cancel-command" type="button">取消</button><button id="promptOptimizeBtn" class="prompt-optimize-command" type="button"><i data-lucide="wand-sparkles"></i><span>开始优化</span></button><button id="promptApplyBtn" class="prompt-apply-command" type="button" disabled><i data-lucide="check"></i><span>采用</span></button></div>
+            </div>
+        </div>
+    </div>
+    <div id="cardContextMenu" class="card-context-menu" hidden role="menu">
+        <button type="button" data-context-action="prompt"><i data-lucide="message-square-text"></i><span>优化提示词</span></button>
+        <button type="button" data-context-action="retry"><i data-lucide="refresh-cw"></i><span>单张重刷</span></button>
+        <button type="button" data-context-action="download"><i data-lucide="download"></i><span>下载当前图片</span></button>
+    </div>
+    <script src="/static/js/one-click-detail.js?v=2026.08.14.8"></script>
+</body>
+</html>

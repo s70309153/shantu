@@ -1,0 +1,38 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+API/.env
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# JavaScript dependencies and build caches
+node_modules/
+.npm/
+.vite/
+dist/
+
+# Local application state, uploads, and generated media
+data/
+assets/input/
+assets/output/
+output/
+history.json
+
+# Bundled local runtime and downloaded packages
+python/
+packages/
+
+# Logs and operating-system files
+*.log
+*.tmp
+Thumbs.db
+Desktop.ini
+.DS_Store
