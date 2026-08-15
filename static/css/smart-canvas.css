@@ -39,6 +39,18 @@ html[data-studio-scale="off"].studio-scale-managed .preview-modal {
 .shell.panning { cursor:grabbing; }
 .shell.zoom-preview { cursor:crosshair; }
 .world { position:absolute; left:0; top:0; width:6000px; height:4000px; transform-origin:0 0; }
+.smart-empty-state { position:absolute; inset:0; z-index:5; display:grid; place-items:center; pointer-events:none; }
+.smart-empty-state[hidden] { display:none !important; }
+.smart-empty-card { width:min(500px, calc(100vw - 40px)); padding:26px; border:1px solid var(--line); border-radius:16px; background:color-mix(in srgb, var(--panel) 92%, transparent); box-shadow:0 22px 58px var(--shadow); backdrop-filter:blur(18px); pointer-events:auto; }
+.smart-empty-mark { width:38px; height:38px; margin:0 auto 12px; border-radius:12px; display:grid; place-items:center; background:var(--soft); border:1px solid var(--line); color:var(--text); }
+.smart-empty-mark i,.smart-empty-mark svg { width:19px; height:19px; }
+.smart-empty-card > strong { display:block; margin-bottom:18px; color:var(--text); text-align:center; font-size:14px; font-weight:850; }
+.smart-empty-actions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+.smart-empty-actions button { min-height:66px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); display:flex; align-items:center; gap:9px; text-align:left; font-size:12px; font-weight:750; transition:transform .14s ease, border-color .14s ease, background .14s ease; }
+.smart-empty-actions button:hover { transform:translateY(-2px); border-color:var(--strong); background:var(--soft); }
+.smart-empty-actions i,.smart-empty-actions svg { width:18px; height:18px; flex:0 0 auto; color:var(--muted); }
+.theme-dark .smart-empty-card { background:color-mix(in srgb, var(--panel) 88%, transparent); }
+@media (max-width:560px) { .smart-empty-card { padding:18px; } .smart-empty-actions { grid-template-columns:1fr; } .smart-empty-actions button { min-height:54px; } }
 /* 画布缩放（非 1:1）时，关闭 world 内卡片的 backdrop-filter，避免合成层位图被缩放导致“参数设置”等组件发虚。
    底色本身接近不透明，关闭毛玻璃后观感几乎无差，但能在各浏览器下保持清晰。 */
 .world.canvas-scaled .image-node,
@@ -358,7 +370,7 @@ body.smart-prompt-split-resize .prompt-node-llm select { pointer-events:none !im
 .loop-smart-run:disabled { opacity:.45; cursor:not-allowed; }
 .create-menu { position:fixed; z-index:75; display:none; width:500px; max-width:calc(100vw - 28px); padding:9px; border-radius:16px; background:var(--panel); border:1px solid var(--line); box-shadow:0 22px 58px var(--shadow); backdrop-filter:blur(20px); }
 .create-menu.open { display:block; }
-.create-menu-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; }
+.create-menu-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
 .create-card { min-height:96px; padding:10px 10px 9px; border-radius:13px; border:1px solid var(--line); background:var(--card); color:var(--text); display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:8px; text-align:left; transition:transform .14s ease, border-color .14s ease, box-shadow .14s ease; }
 .create-card:hover { transform:translateY(-2px); border-color:var(--strong); box-shadow:0 10px 24px rgba(15,23,42,.1); }
 .create-card > span:not(.create-card-icon) { display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; width:100%; }
@@ -396,6 +408,22 @@ body.smart-node-resize .smart-node-floating-menu,
     .smart-node-floating-menu button span { display:none; }
     .smart-node-floating-menu button { width:30px; padding:0; }
 }
+.image-node.workflow-smart-node { min-height:0; overflow:visible; cursor:default; user-select:none; }
+.workflow-node-card { width:100%; height:100%; overflow:hidden; border:1px solid var(--line); border-radius:14px; background:var(--panel); box-shadow:0 18px 48px var(--shadow); }
+.workflow-node-header { height:40px; padding:0 8px 0 12px; border-bottom:1px solid var(--line); background:var(--panel); display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:move; }
+.workflow-node-title { min-width:0; display:flex; align-items:center; gap:7px; color:var(--text); font-size:11px; font-weight:850; }
+.workflow-node-title i,.workflow-node-title svg { width:15px; height:15px; color:var(--muted); flex:0 0 auto; }
+.workflow-node-title span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.workflow-node-actions { display:flex; align-items:center; gap:2px; }
+.workflow-node-control { width:28px; height:28px; padding:0; border-radius:8px; background:transparent; color:var(--muted); display:grid; place-items:center; }
+.workflow-node-control:hover { background:var(--soft); color:var(--text); }
+.workflow-node-control i,.workflow-node-control svg { width:15px; height:15px; }
+.workflow-node-delete:hover { color:#dc2626; background:rgba(220,38,38,.10); }
+.workflow-node-frame { width:100%; height:calc(100% - 40px); display:block; border:0; background:var(--card); }
+.workflow-smart-node .node-body { width:100%; height:100%; min-height:0; padding:0; align-items:stretch; justify-content:stretch; }
+.workflow-smart-node .node-head,.workflow-smart-node .node-hint,.workflow-smart-node .floating-node-actions { display:none !important; }
+.workflow-smart-node .node-port { top:50%; }
+.workflow-smart-node .node-resize-handle { z-index:20; }
 .node-count { min-width:22px; height:20px; padding:0 7px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:var(--soft); border:1px solid var(--line); color:var(--muted); font-size:10px; font-weight:900; }
 .mini-x { width:26px; height:26px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; color:#94a3b8; background:rgba(255,255,255,.92); border:1px solid #e8edf3; opacity:1; cursor:pointer; box-shadow:0 8px 18px rgba(15,23,42,.12); backdrop-filter:blur(10px); transition:opacity .14s ease, transform .14s ease, background .14s ease, color .14s ease, border-color .14s ease; }
 .mini-x:hover { opacity:1; color:#dc2626; background:#fee2e2; border-color:#fecaca; transform:translateY(-1px); }

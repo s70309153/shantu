@@ -1,8 +1,9 @@
 (function(){
     'use strict';
 
-    const DETAIL_STORAGE_KEY = 'studio_main_image_draft_v1';
-    const LEGACY_STORAGE_KEY = 'studio_detail_page_draft_v2';
+    const canvasNodeId = new URLSearchParams(location.search).get('canvasNode') || '';
+    const DETAIL_STORAGE_KEY = canvasNodeId ? `studio_main_image_canvas_${canvasNodeId}_draft_v1` : 'studio_main_image_draft_v1';
+    const LEGACY_STORAGE_KEY = canvasNodeId ? '' : 'studio_detail_page_draft_v2';
     const DETAIL_PRESET_KEY = 'studio_main_image_preset_v1';
     const LEGACY_PRESET_KEY = 'studio_detail_page_preset_v2';
     const MAX_SOURCE_IMAGES = 6;
@@ -1662,7 +1663,7 @@
 
     function restoreDraft(){
         let draft = null;
-        try { draft = JSON.parse(localStorage.getItem(DETAIL_STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || 'null'); }
+        try { draft = JSON.parse(localStorage.getItem(DETAIL_STORAGE_KEY) || (LEGACY_STORAGE_KEY ? localStorage.getItem(LEGACY_STORAGE_KEY) : '') || 'null'); }
         catch(error){ draft = null; }
         if(!draft || typeof draft !== 'object'){
             renderProducts();

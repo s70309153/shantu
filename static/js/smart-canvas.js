@@ -16,6 +16,7 @@ const smartProjectNewBtn = document.getElementById('smartProjectNewBtn');
 const smartProjectDeleteConfirm = document.getElementById('smartProjectDeleteConfirm');
 const composer = document.getElementById('composer');
 const createMenu = document.getElementById('createMenu');
+const smartEmptyState = document.getElementById('smartEmptyState');
 const promptInput = document.getElementById('promptInput');
 const mentionPicker = document.getElementById('mentionPicker');
 const mentionPreview = document.getElementById('mentionPreview');
@@ -998,6 +999,9 @@ function isSmartImageNode(node){
 function isSmartGroupNode(node){
     return Boolean(node && node.type === 'smart-group');
 }
+function isSmartWorkflowNode(node){
+    return Boolean(node && node.type === 'smart-workflow');
+}
 function isSmartRunnableNode(node){
     return Boolean(isSmartImageNode(node) || isSmartGroupNode(node));
 }
@@ -1639,6 +1643,10 @@ const SMART_GROUP_LEGACY_HEIGHT = 220;
 // 分组可缩小到的最小尺寸（缩小分组时组内图片随之等比缩小，靠这个区间产生缩放系数）。
 const SMART_GROUP_MIN_WIDTH = 150;
 const SMART_GROUP_MIN_HEIGHT = 130;
+const SMART_WORKFLOW_DEFAULT_WIDTH = 352;
+const SMART_WORKFLOW_DEFAULT_HEIGHT = 820;
+const SMART_WORKFLOW_MIN_WIDTH = 320;
+const SMART_WORKFLOW_MIN_HEIGHT = 520;
 // 组内成员（提示词/循环）的最大缩放。已移除“放大不超过原始”的限制：向外拉分组时成员随之放大。
 const SMART_GROUP_MAX_MEMBER_ZOOM = 4;
 function mediaNodeDefaultScale(node){
@@ -1659,6 +1667,14 @@ function smartGroupLayoutSize(node){
     return {
         width:Math.round(width),
         height:Math.round(height)
+    };
+}
+function smartWorkflowLayoutSize(node){
+    const explicitW = Number(node?.w);
+    const explicitH = Number(node?.h);
+    return {
+        width:Math.round(Number.isFinite(explicitW) ? Math.max(SMART_WORKFLOW_MIN_WIDTH, explicitW) : SMART_WORKFLOW_DEFAULT_WIDTH),
+        height:Math.round(Number.isFinite(explicitH) ? Math.max(SMART_WORKFLOW_MIN_HEIGHT, explicitH) : SMART_WORKFLOW_DEFAULT_HEIGHT)
     };
 }
 function smartGroupMembers(node){
@@ -2185,6 +2201,7 @@ function smartGroupImageGridLayout(node){
     return {cols, rows, visibleRows, width, height, thumb:baseThumb};
 }
 function imageLayout(images, scale=1, node=null){
+    if(isSmartWorkflowNode(node)) return {cols:1, rows:1, ...smartWorkflowLayoutSize(node), thumb:96, single:true};
     if(node?.type === 'smart-group'){
         const groupThumbLayout = smartGroupThumbLayout(node);
         if(groupThumbLayout) return groupThumbLayout;
@@ -6209,6 +6226,31 @@ function createNode(x, y, images=[], options={}){
     scheduleSave();
     return node;
 }
+function createSmartWorkflowNode(point, workflow='detail', options={}){
+    if(!options.skipUndo) pushUndo();
+    const kind = workflow === 'main-image' ? 'main-image' : 'detail';
+    const layout = smartWorkflowLayoutSize(options);
+    const node = {
+        id:uid('workflow'),
+        type:'smart-workflow',
+        workflow:kind,
+        title:kind === 'main-image' ? '一键主图' : '一键详情页',
+        x:Math.round((point?.x || 0) - layout.width / 2),
+        y:Math.round((point?.y || 0) - layout.height / 2),
+        w:layout.width,
+        h:layout.height,
+        created_at:Date.now()
+    };
+    nodes.push(node);
+    if(options.select !== false){
+        selectedId = node.id;
+        selectedIds = [];
+        selectedImage = {nodeId:'', index:-1};
+    }
+    render();
+    scheduleSave();
+    return node;
+}
 function createPromptNode(x, y, options={}){
     if(!options.skipUndo) pushUndo();
     const providerId = resolveChatProviderId();
@@ -7492,7 +7534,25 @@ function smartGroupBodyHtml(node){
         ${members.length ? '' : `<div class="smart-group-empty"><i data-lucide="plus"></i><span>拖入图片自动收进分组</span></div>`}
     </div>`;
 }
+function smartWorkflowBodyHtml(node){
+    const isMainImage = node.workflow === 'main-image';
+    const title = isMainImage ? '一键主图' : '一键详情页';
+    const page = isMainImage ? 'detail-page.html' : 'one-click-detail.html';
+    const targetPage = isMainImage ? 'detail-page' : 'one-click-detail';
+    const src = `/static/${page}?embed=canvas&canvasNode=${encodeURIComponent(node.id)}`;
+    return `<div class="workflow-node-card">
+        <div class="workflow-node-header workflow-node-drag-handle">
+            <div class="workflow-node-title"><i data-lucide="${isMainImage ? 'gallery-vertical-end' : 'panels-top-left'}"></i><span>${title}</span></div>
+            <div class="workflow-node-actions">
+                <button class="workflow-node-control" type="button" data-workflow-open="${targetPage}" title="打开完整工作台"><i data-lucide="external-link"></i></button>
+                <button class="workflow-node-control workflow-node-delete" type="button" data-workflow-delete="${escapeAttr(node.id)}" title="删除节点"><i data-lucide="trash-2"></i></button>
+            </div>
+        </div>
+        <iframe class="workflow-node-frame" src="${escapeAttr(src)}" title="${title}" loading="eager"></iframe>
+    </div>`;
+}
 function nodeBodyHtml(node, layout){
+    if(isSmartWorkflowNode(node)) return smartWorkflowBodyHtml(node);
     if(node.type === 'smart-group') return smartGroupBodyHtml(node);
     if(node.type === 'smart-prompt') return promptNodeBodyHtml(node);
     if(node.type === 'smart-loop') return smartLoopBodyHtml(node);
@@ -7736,6 +7796,10 @@ function rememberInlineVideoActivations(){
         if(image && mediaKindForItem(image) === 'video') image._inlineVideoActive = true;
     });
 }
+function toggleSmartEmptyState(){
+    if(!smartEmptyState) return;
+    smartEmptyState.hidden = nodes.length > 0;
+}
 function render(){
     if(smartWorkflowTransferModal?.classList.contains('open')) updateSmartWorkflowTransferMeta();
     rememberInlineVideoActivations();
@@ -7748,7 +7812,7 @@ function render(){
     const reusableNodes = new Map();
     world.querySelectorAll('.image-node').forEach(el => {
         const node = nodes.find(n => n.id === el.dataset.id);
-        if(smartNodeHasLiveMedia(node)) reusableNodes.set(node.id, el);
+        if(smartNodeHasLiveMedia(node) || isSmartWorkflowNode(node)) reusableNodes.set(node.id, el);
     });
     const nodeHtmlEntries = nodes
         .filter(node => node.id !== SMART_LOG_PREVIEW_NODE_ID)
@@ -7764,6 +7828,7 @@ function render(){
         const isPrompt = node.type === 'smart-prompt';
         const isLoop = node.type === 'smart-loop';
         const isSmartGroup = node.type === 'smart-group';
+        const isWorkflow = isSmartWorkflowNode(node);
         const isCompactMember = isSmartGroupCompactMember(node);
         const isImageNode = node.type === 'smart-image' || !node.type;
         const isJimengPending = Boolean(node.jimengPending && node.jimengPending.submitId && imgs.length === 0);
@@ -7775,7 +7840,7 @@ function render(){
         const body = nodeBodyHtml(node, layout);
         const deleteBtn = isGroup ? '' : `<button class="mini-x node-delete" type="button" title="${escapeHtml(tr('smart.deleteNode'))}"><i data-lucide="trash-2"></i></button>`;
         const hint = isSmartGroup ? '双击添加 · 拖入归组 · 选中后生成' : isPending ? escapeHtml(tr('smart.hintPending')) : (imgs.length > 1 ? escapeHtml(tr('smart.hintMulti')) : imgs.length ? escapeHtml(tr('smart.hintSingle')) : escapeHtml(tr('smart.hintEmpty')));
-        const html = `<div class="image-node ${isEmpty ? 'empty-node' : ''} ${isGroup ? 'group-node' : ''} ${isHistory ? 'history-group-node' : ''} ${isPrompt ? 'prompt-smart-node' : ''} ${isLoop ? 'loop-smart-node' : ''} ${isSmartGroup ? 'smart-group-node' : ''} ${isCompactMember ? 'smart-group-member-node' : ''} ${isNodeSelected(node.id) ? 'selected' : ''} ${(dragState?.groupIds?.includes(node.id) || dragState?.id === node.id) ? 'dragging' : ''} ${node.running ? 'node-running' : ''} ${isPending ? 'node-pending' : ''}" data-id="${escapeHtml(node.id)}" style="left:${node.x || 0}px;top:${node.y || 0}px;width:${layout.width}px;height:${layout.height}px">
+        const html = `<div class="image-node ${isEmpty ? 'empty-node' : ''} ${isGroup ? 'group-node' : ''} ${isHistory ? 'history-group-node' : ''} ${isPrompt ? 'prompt-smart-node' : ''} ${isLoop ? 'loop-smart-node' : ''} ${isSmartGroup ? 'smart-group-node' : ''} ${isWorkflow ? 'workflow-smart-node' : ''} ${isCompactMember ? 'smart-group-member-node' : ''} ${isNodeSelected(node.id) ? 'selected' : ''} ${(dragState?.groupIds?.includes(node.id) || dragState?.id === node.id) ? 'dragging' : ''} ${node.running ? 'node-running' : ''} ${isPending ? 'node-pending' : ''}" data-id="${escapeHtml(node.id)}" style="left:${node.x || 0}px;top:${node.y || 0}px;width:${layout.width}px;height:${layout.height}px">
             <div class="node-head"><div class="node-title">${title}</div><div class="node-actions">${deleteBtn}</div></div>
             ${!isEmpty && !isGroup ? `<div class="floating-node-actions"><button class="mini-x node-delete" type="button" title="${escapeHtml(tr('smart.deleteNode'))}"><i data-lucide="trash-2"></i></button></div>` : ''}
             ${smartNodeToolbarHtml(node)}${smartGroupToolbarHtml(node)}
@@ -7783,7 +7848,7 @@ function render(){
             <div class="node-body">${body}</div>
             ${isCompactMember && (isPrompt || isLoop) ? '<div class="smart-group-member-grab" title="拖动移出分组"></div>' : ''}
             <div class="node-hint">${hint}</div>
-            ${imgs.length || node.pending || isQueued || isJimengPending || isPrompt || isLoop || isSmartGroup ? '<div class="node-resize-handle" data-resize="1"></div>' : ''}
+            ${imgs.length || node.pending || isQueued || isJimengPending || isPrompt || isLoop || isSmartGroup || isWorkflow ? '<div class="node-resize-handle" data-resize="1"></div>' : ''}
             <div class="node-port port-in" data-port="in" title="input"></div>
             <div class="node-port port-out" data-port="out" title="output"></div>
         </div>`;
@@ -7812,7 +7877,13 @@ function render(){
         world.appendChild(fresh);
         const reusable = reusableNodes.get(entry.node.id);
         if(reusable){
-            transplantSmartMediaElements(reusable, fresh);
+            if(isSmartWorkflowNode(entry.node)){
+                const oldFrame = reusable.querySelector('.workflow-node-frame');
+                const newFrame = fresh.querySelector('.workflow-node-frame');
+                if(oldFrame && newFrame) newFrame.replaceWith(oldFrame);
+            } else {
+                transplantSmartMediaElements(reusable, fresh);
+            }
             if(reusable !== fresh) reusable.remove();
         }
     });
@@ -7826,6 +7897,7 @@ function render(){
     syncSmartSelectedImageResolution(world);
     measureSmartNodeImages();
     refreshRunTimerPills();
+    toggleSmartEmptyState();
     return;
     world.innerHTML = '';
     if(composerEl) world.appendChild(composerEl);
@@ -8381,12 +8453,41 @@ function pickMediaForSmartNode(nodeId){
     document.body.appendChild(input);
     input.click();
 }
+function bindWorkflowNodeControls(el, node){
+    const control = el.querySelector('[data-workflow-open]');
+    const remove = el.querySelector('[data-workflow-delete]');
+    [control, remove].filter(Boolean).forEach(button => button.addEventListener('mousedown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, true));
+    if(control) control.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const page = control.dataset.workflowOpen || (node.workflow === 'main-image' ? 'detail-page' : 'one-click-detail');
+        const pageFile = page === 'detail-page' ? 'detail-page.html' : 'one-click-detail.html';
+        const targetUrl = `/static/${pageFile}?canvasNode=${encodeURIComponent(node.id)}`;
+        try {
+            const parentFrame = window.parent?.document?.getElementById?.(`frame-${page}`);
+            if(parentFrame) parentFrame.src = targetUrl;
+            const parentButton = window.parent?.document?.querySelector?.(`.rail-action[data-page="${page}"]`);
+            if(parentButton){ parentButton.click(); return; }
+            if(typeof window.parent?.switchUI === 'function'){ window.parent.switchUI(null, page); return; }
+        } catch(error) {}
+        window.open(targetUrl, '_blank', 'noopener');
+    });
+    if(remove) remove.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteNodeFromButton(node.id);
+    });
+}
 function bindNodeEvents(){
     world.querySelectorAll('.image-node').forEach(el => {
         const id = el.dataset.id;
         const nodeForControls = nodes.find(n => n.id === id);
         if(nodeForControls?.type === 'smart-prompt') bindPromptNodeControls(el, nodeForControls);
         if(nodeForControls?.type === 'smart-loop') bindLoopNodeControls(el, nodeForControls);
+        if(isSmartWorkflowNode(nodeForControls)) bindWorkflowNodeControls(el, nodeForControls);
         if(nodeForControls?.type === 'smart-group') {
             el.ondblclick = e => {
                 e.preventDefault();
@@ -8662,6 +8763,7 @@ function bindNodeEvents(){
         const beginNodeDrag = e => {
             if(e.button !== 0 || e.target.closest('.mini-x, .smart-node-floating-menu, .node-resize-handle, .thumb-item, .node-port, .prompt-node-control, select, input, textarea, button')) return;
             if(e.target.closest('.prompt-node-pill, textarea:not(.prompt-node-text)')) return;
+            if(isSmartWorkflowNode(nodeForControls) && !e.target.closest('.workflow-node-drag-handle')) return;
             e.preventDefault(); e.stopPropagation();
             window.getSelection?.()?.removeAllRanges?.();
             if(document.activeElement?.blur) document.activeElement.blur();
@@ -15764,7 +15866,7 @@ function openCreateMenu(event, options={}){
     createMenuPoint = screenToWorld(event);
     createMenuGroupId = options.groupId || '';
     const w = 500;
-    const h = 114;
+    const h = 218;
     const left = Math.max(14, Math.min(window.innerWidth - w - 14, event.clientX + 8));
     const top = Math.max(14, Math.min(window.innerHeight - h - 14, event.clientY + 8));
     createMenu.style.left = `${left}px`;
@@ -15781,15 +15883,27 @@ function addCreatedNodeToMenuGroup(node){
         scheduleSave();
     }
 }
-function createNodeFromMenu(type){
-    const p = createMenuPoint || viewportCenter();
+function createNodeFromMenu(type, pointOverride=null){
+    const p = pointOverride || createMenuPoint || viewportCenter();
     const groupId = createMenuGroupId;
     closeCreateMenu();
     if(type === 'group') return createSmartGroupNode(p.x - 170, p.y - 110);
     let created = null;
     if(type === 'prompt') created = createPromptNode(p.x - 158, p.y - 97);
     else if(type === 'loop') created = createLoopNode(p.x - 135, p.y - 95);
-    else created = createImageNodeAt(p);
+    else if(type === 'detail') created = createSmartWorkflowNode(p, 'detail');
+    else if(type === 'main-image') created = createSmartWorkflowNode(p, 'main-image');
+    else {
+        if(type === 'video'){
+            settings.engine = 'api';
+            settings.apiKind = 'video';
+        }
+        created = createImageNodeAt(p);
+        if(type === 'video'){
+            updateComposer();
+            requestAnimationFrame(() => promptInput?.focus());
+        }
+    }
     createMenuGroupId = groupId;
     addCreatedNodeToMenuGroup(created);
     createMenuGroupId = '';
@@ -15985,8 +16099,8 @@ window.onmousemove = e => {
         if(!node) return;
         const dx = (e.clientX - resizeState.startX) / viewport.scale;
         const dy = (e.clientY - resizeState.startY) / viewport.scale;
-        const minW = node.type === 'smart-prompt' ? 260 : node.type === 'smart-loop' ? 252 : node.type === 'smart-group' ? SMART_GROUP_MIN_WIDTH : 48;
-        const minH = node.type === 'smart-prompt' ? 170 : node.type === 'smart-loop' ? 132 : node.type === 'smart-group' ? SMART_GROUP_MIN_HEIGHT : 48;
+        const minW = node.type === 'smart-prompt' ? 260 : node.type === 'smart-loop' ? 252 : node.type === 'smart-group' ? SMART_GROUP_MIN_WIDTH : node.type === 'smart-workflow' ? SMART_WORKFLOW_MIN_WIDTH : 48;
+        const minH = node.type === 'smart-prompt' ? 170 : node.type === 'smart-loop' ? 132 : node.type === 'smart-group' ? SMART_GROUP_MIN_HEIGHT : node.type === 'smart-workflow' ? SMART_WORKFLOW_MIN_HEIGHT : 48;
         if(node.type === 'smart-group' && smartGroupImageRefs(node).some(ref => ref.item?.url)){
             // 图片分组：和普通节点一样直接改 w/h，缩略图网格按新尺寸实时重排。不要走下面的“成员缩放”那套，
             // 否则拖动过程里会按成员包围盒/缩放比例收缩，松手才回到拖动宽度（用户反馈的“变宽时先缩小”）。
@@ -16875,6 +16989,13 @@ createMenu?.addEventListener('click', event => {
     event.stopPropagation();
     const card = event.target.closest('[data-create-type]');
     if(card) createNodeFromMenu(card.dataset.createType || 'image');
+});
+smartEmptyState?.addEventListener('mousedown', event => event.stopPropagation());
+smartEmptyState?.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopPropagation();
+    const action = event.target.closest('[data-empty-create]');
+    if(action) createNodeFromMenu(action.dataset.emptyCreate || 'image', viewportCenter());
 });
 composer.addEventListener('pointerdown', event => event.stopPropagation());
 composer.addEventListener('mousedown', event => event.stopPropagation());

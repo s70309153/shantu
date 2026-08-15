@@ -8,6 +8,7 @@
     <script>
         // Some vendor scripts may observe before the iframe body has been created.
         (function(){
+            if(new URLSearchParams(location.search).get('embed') === 'canvas') document.documentElement.classList.add('canvas-embed');
             try {
                 const observe = MutationObserver.prototype.observe;
                 MutationObserver.prototype.observe = function(target, options){
@@ -21,7 +22,7 @@
     <script src="/static/js/theme.js?v=2026.07.8.1783524419"></script>
     <script src="/static/js/i18n.js?v=2026.08.14.one-click-detail.1"></script>
     <link rel="stylesheet" href="/static/css/theme.css?v=2026.07.8.1783524419">
-    <link rel="stylesheet" href="/static/css/one-click-detail.css?v=2026.08.14.3">
+    <link rel="stylesheet" href="/static/css/one-click-detail.css?v=2026.08.15.canvas-embed.1">
 </head>
 <body>
     <main class="detail-app">
@@ -250,6 +251,6 @@
         <button type="button" data-context-action="retry"><i data-lucide="refresh-cw"></i><span>单张重刷</span></button>
         <button type="button" data-context-action="download"><i data-lucide="download"></i><span>下载当前图片</span></button>
     </div>
-    <script src="/static/js/one-click-detail.js?v=2026.08.14.8"></script>
+    <script src="/static/js/one-click-detail.js?v=2026.08.15.canvas-node.1"></script>
 </body>
 </html>

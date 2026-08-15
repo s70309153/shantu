@@ -20,7 +20,7 @@
     <script src="/static/js/theme.js?v=2026.07.8.1783524419"></script>
     <script src="/static/js/touch-mouse.js?v=2026.07.8.1783524419"></script>
     <script src="/static/js/i18n.js?v=2026.07.8.1786648532"></script>
-    <link rel="stylesheet" href="/static/css/smart-canvas.css?v=2026.08.15.project-hub.1">
+    <link rel="stylesheet" href="/static/css/smart-canvas.css?v=2026.08.15.canvas-workflow.1">
 </head>
 <body>
     <div id="shell" class="shell">
@@ -62,6 +62,18 @@
                 </div>
             </div>
         </div>
+        <section id="smartEmptyState" class="smart-empty-state" hidden aria-label="画布快捷创建">
+            <div class="smart-empty-card">
+                <div class="smart-empty-mark"><i data-lucide="sparkles"></i></div>
+                <strong>开始创作</strong>
+                <div class="smart-empty-actions">
+                    <button type="button" data-empty-create="image"><i data-lucide="image-plus"></i><span>生成图片</span></button>
+                    <button type="button" data-empty-create="video"><i data-lucide="film"></i><span>生成视频</span></button>
+                    <button type="button" data-empty-create="detail"><i data-lucide="panels-top-left"></i><span>一键详情页</span></button>
+                    <button type="button" data-empty-create="main-image"><i data-lucide="gallery-vertical-end"></i><span>一键主图</span></button>
+                </div>
+            </div>
+        </section>
         <header id="smartProjectBar" class="smart-project-bar">
             <div class="smart-project-brand" aria-label="AI Studio">
                 <img src="/static/images/logo.png" alt="">
@@ -118,6 +130,20 @@
                     <span>
                         <div class="create-card-title">循环</div>
                         <div class="create-card-sub">控制运行轮数、批次和变量</div>
+                    </span>
+                </button>
+                <button class="create-card" type="button" data-create-type="detail">
+                    <span class="create-card-icon"><i data-lucide="panels-top-left"></i></span>
+                    <span>
+                        <div class="create-card-title">一键详情页</div>
+                        <div class="create-card-sub">在画布内编辑商品详情工作台</div>
+                    </span>
+                </button>
+                <button class="create-card" type="button" data-create-type="main-image">
+                    <span class="create-card-icon"><i data-lucide="gallery-vertical-end"></i></span>
+                    <span>
+                        <div class="create-card-title">一键主图</div>
+                        <div class="create-card-sub">在画布内编辑主图生成工作台</div>
                     </span>
                 </button>
             </div>
